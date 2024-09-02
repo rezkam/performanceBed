@@ -13,11 +13,24 @@ Regular expressions are a powerful tool for pattern matching, but they can be pr
 When the regex engine tries to match this pattern against a long string of 'a's with no 'b' at the end, it may try numerous combinations of possible matches due to backtracking, which can lead to extremely slow performance.
 
 ## Results
-| Language   | Time Taken                  |
+| Language   | Time Taken (100 chars)      |
 |------------|-----------------------------|
-| Go         | 9.9542e-05 seconds          |
+| Go         | 0.000099542 seconds         |
+| Rust       | 0.000166 seconds            |
 | Java       | 0.003591667 seconds         |
 | JavaScript | 90.5432 seconds             |
 | Python     | No results after 1000 seconds |
 | C# (.NET)  | No results after 1000 seconds |
 
+| Language   | Time Taken (100,000 chars)  |
+|------------|-----------------------------|
+| Rust       | 0.000016 seconds            |
+| Go         | 0.000171292 seconds         |
+| Java       | 47.772044583 seconds        |
+| JavaScript | No results after 1000 seconds |
+| Python     | No results after 1000 seconds |
+| C# (.NET)  | No results after 1000 seconds |
+
+
+### Benchmark Environment
+The benchmarks were run on my local machine, a MacBook with an M3 Pro chip featuring 12 CPU cores.
