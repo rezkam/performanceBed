@@ -1,33 +1,105 @@
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
-import java.util.regex.Matcher;
 
-class RegexBacktracking {
-    public static void main(String[] args) {
-        long startTime = System.nanoTime();
+class nestedMatch {
 
-        // A pattern with nested quantifiers
-        String pattern = "(a+)+b";
-        Pattern re = Pattern.compile(pattern);
+    // Utility function to create a regex pattern dynamically
+    public static String createPattern(int n) {
+        return "(a?){" + n + "}(a){" + n + "}";
+    }
 
-        // A longer string of 'a's with a 'b' at the end, then remove the 'b'
-        StringBuilder text = new StringBuilder("a");
-        for (int i = 0; i < 100; i++) {
-            text.append("a");
+    // Function to perform regex matching with a timeout
+    public static boolean matchWithTimeout(String text, String pattern, long timeout, TimeUnit unit) throws TimeoutException {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Future<Boolean> future = executor.submit(new Callable<Boolean>() {
+            @Override
+            public Boolean call() {
+                Pattern regex = Pattern.compile(pattern);
+                return regex.matcher(text).matches();
+            }
+        });
+
+        try {
+            return future.get(timeout, unit);  // Await the result with timeout
+        } catch (TimeoutException e) {
+            future.cancel(true);  // Cancel the task if timeout occurs
+            throw e;
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+            return false;
+        } finally {
+            executor.shutdown();
         }
-        text.append("b");
+    }
 
-        // Remove the 'b' to trigger backtracking
-        String testString = text.toString().substring(0, text.length() - 1);
+    // Main function to run the sequence
+    public static void runSequentially(int maxTries, long matchTimeout, TimeUnit unit) {
+        List<Integer> nValues = new ArrayList<>();
+        List<Double> timeValues = new ArrayList<>();
 
-        // Attempt to match the pattern
-        Matcher matcher = re.matcher(testString);
-        boolean match = matcher.find();
+        for (int n = 1; n <= maxTries; n++) {
+            StringBuilder textBuilder = new StringBuilder();
+            for (int i = 0; i < n; i++) {
+                textBuilder.append("a");
+            }
+            String text = textBuilder.toString();
+            String pattern = createPattern(n);
 
-        // End timing
-        long endTime = System.nanoTime();
+            long startTime = System.nanoTime();
 
-        // Print the result and the time it took
-        System.out.println("Match: " + match);
-        System.out.println("Time taken: " + (endTime - startTime) / 1e9 + " seconds");
+            try {
+                boolean match = matchWithTimeout(text, pattern, matchTimeout, unit);
+                long endTime = System.nanoTime();
+                double timeTaken = (endTime - startTime) / 1_000_000_000.0;
+
+                if (!match) {
+                    System.out.printf("No match for n=%d\n", n);
+                    break;
+                }
+
+                nValues.add(n);
+                timeValues.add(timeTaken);
+                System.out.printf("Time taken for n=%d: %.10f seconds\n", n, timeTaken);
+
+            } catch (TimeoutException e) {
+                long endTime = System.nanoTime();
+                double timeTaken = (endTime - startTime) / 1_000_000_000.0;
+                System.out.printf("Match for n=%d timed out after %.10f seconds\n", n, timeTaken);
+                break;
+            }
+        }
+
+        exportToCSV("java-run-stats.csv", nValues, timeValues);
+    }
+
+    // Function to export data points to a CSV file
+    public static void exportToCSV(String filename, List<Integer> nValues, List<Double> timeValues) {
+        try (FileWriter writer = new FileWriter(filename)) {
+            writer.append("n,time-seconds\n");
+            for (int i = 0; i < nValues.size(); i++) {
+                writer.append(nValues.get(i).toString()).append(",")
+                        .append(String.format("%.10f", timeValues.get(i))).append("\n");
+            }
+            System.out.printf("Data successfully exported to %s\n", filename);
+        } catch (IOException e) {
+            System.out.println("Error creating file: " + e.getMessage());
+        }
+    }
+
+    public static void main(String[] args) {
+        long matchTimeout = 10;  // seconds
+        int maxTries = 1000;
+
+        runSequentially(maxTries, matchTimeout, TimeUnit.SECONDS);
     }
 }
